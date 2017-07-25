@@ -1,0 +1,55 @@
+<div class="page-header">
+  <h1>Contents of <%=h @bucket[:name] %></h1>
+</div>
+
+<form action="/buckets/<%=h @bucket[:name] %>" method="get">
+  <div class="form-group">
+    <input type="text" class="form-control" name="query" id="object_search" placeholder="Search..." value="<%=h @query %>" />
+  </div>
+</form>
+
+<% if @objects.count.zero? %>
+  <h2>Nothing to show</h2>
+<% else %>
+  <table class="table table-hover table-striped">
+    <thead>
+      <tr>
+        <th>Key</th>
+        <th>Size</th>
+        <th style="width:70px">Access</th>
+        <th style="width:130px; text-align:right">Last Modified At</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @objects.each do |object| %>
+        <tr class="<%=h object.public ? 'success' : 'warning' %>">
+          <td><a href="<%=h object.url %>" onclick="return confirm('Are you sure?')" target="_blank"><%= format_path(object.key) %></a></td>
+          <td><%= number_to_human_size(object.size) %></td>
+          <td><%=h object.public ? "Public" : "Private" %></td>
+          <td><%=h object.last_modified_at.strftime("%d/%m/%Y %H:%M") %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <ul class="pager">
+    <% if @objects.first_page? %>
+      <li class="disabled"><a href="#">&laquo; Previous page</a></li>
+    <% else %>
+      <% if @query %>
+        <li><a href="/buckets/<%=h @bucket.name %>?query="<%=h @query %>&page=<%=h @objects.current_page - 1 %>">&laquo; Previous page</a></li>
+      <% else %>
+        <li><a href="/buckets/<%=h @bucket.name %>?page=<%=h @objects.current_page - 1 %>">&laquo; Previous page</a></li>
+      <% end %>
+    <% end %>
+    <% if @objects.last_page? %>
+      <li class="disabled"><a href="#">Next page &raquo;</a></li>
+    <% else %>
+      <% if @query %>
+        <li><a href="/buckets/<%=h @bucket.name %>?query=<%=h @query %>&page=<%=h @objects.current_page + 1 %>">Next page &raquo;</a></li>
+      <% else %>
+        <li><a href="/buckets/<%=h @bucket.name %>?page=<%=h @objects.current_page + 1 %>">Next page &raquo;</a></li>
+      <% end %>
+    <% end %>
+  </ul>
+<% end %>

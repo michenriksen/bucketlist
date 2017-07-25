@@ -1,0 +1,74 @@
+#!/usr/bin/env ruby
+require_relative "../bootstrap"
+
+THREADS = 10
+MUTEX   = Mutex.new
+
+module Util
+  HUMAN_PREFIXES = %w(TB GB MB KB B).freeze
+
+  def self.number_to_human_size(number)
+    s = number.to_f
+    i = HUMAN_PREFIXES.length - 1
+    while s > 512 && i > 0
+      i -= 1
+      s /= 1024
+    end
+    ((s > 9 || s.modulo(1) < 0.1 ? "%d" : "%.1f") % s) + "#{HUMAN_PREFIXES[i]}"
+  end
+end
+
+def with_mutex
+  MUTEX.synchronize { yield }
+end
+
+buckets = Bucket.where(:public => true, :crawled_at => nil)
+
+if buckets.count.zero?
+  puts "All public buckets have been crawled. Time to find more with bucket_finder."
+  exit
+end
+
+buckets.each do |bucket|
+  puts "├── #{bucket.url.bold}"
+  begin
+    response = HTTParty.get(bucket.url, :verify => false, :timeout => 30)
+    body     = Ox.parse(response.body)
+    contents = body.root.locate("Contents")
+    thread_pool = Thread.pool(THREADS)
+    contents.each do |content|
+      thread_pool.process do
+        begin
+          key = content.Key.text
+          object = BucketObject.new(
+            :bucket_id        => bucket.id,
+            :key              => key,
+            :url              => "#{bucket.url}#{CGI.escape(key).gsub('%2F', '/')}",
+            :etag             => content.ETag.text.gsub('"', ""),
+            :size             => content.Size.text.to_i,
+            :storage_class    => content.StorageClass.text,
+            :last_modified_at => Time.parse(content.LastModified.text)
+          )
+          if !object.key.end_with?("/")
+            content_response = HTTParty.head(object.url, :verify => false, :timeout => 30)
+            if content_response.code == 200
+              object.public = true
+              with_mutex { puts "│   ├──  " + "PUBLIC: #{object.url.bold} (#{Util.number_to_human_size(object.size)})".green }
+            else
+              object.public = false
+              with_mutex { puts "│   ├── " + "PRIVATE: #{object.url.bold} (#{Util.number_to_human_size(object.size)})".yellow }
+            end
+            object.save
+          end
+        rescue => e
+          with_mutex { puts "│   ├── " + "  ERROR: Key: #{key}: #{e.class}: #{e.message}".red }
+        end
+      end
+    end
+    thread_pool.shutdown
+    bucket.crawled_at = Time.now
+    bucket.save
+  rescue => e
+    puts "│   ├── " + "  ERROR: #{key}: #{e.class}: #{e.message}".red
+  end
+end

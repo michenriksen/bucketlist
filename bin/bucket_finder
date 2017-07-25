@@ -1,0 +1,138 @@
+#!/usr/bin/env ruby
+require_relative "../bootstrap"
+
+THREADS = 10
+MUTEX   = Mutex.new
+
+class Wordlist
+  PERMUTATION_PATTERNS = %w(%s.%s %s-%s %s%s).freeze
+  PERMUTATION_WORDS    = %w(backup backups dev development prod production stage staging test testing).freeze
+
+  def initialize(filepath)
+    if !File.readable?(filepath)
+      raise "Wordlist #{filepath} does not exist or is not readable"
+    end
+    @filepath = filepath
+  end
+
+  def run
+    File.read(@filepath).each_line do |word|
+      word.strip!
+      next if word.empty?
+      yield word
+      PERMUTATION_PATTERNS.each do |permutation_pattern|
+        PERMUTATION_WORDS.each do |permutation_word|
+          yield format(permutation_pattern, word, permutation_word)
+          yield format(permutation_pattern, permutation_word, word)
+        end
+      end
+    end
+  end
+end
+
+class S3Bucket
+  REGION = "s3.amazonaws.com".freeze
+
+  USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_5) AppleWebKit/603.2.4 (KHTML, like Gecko) Version/10.1.1 Safari/603.2.4",
+    "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:54.0) Gecko/20100101 Firefox/54.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/54.0",
+    "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36",
+    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:54.0) Gecko/20100101 Firefox/54.0",
+    "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko",
+    "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.12; rv:54.0) Gecko/20100101 Firefox/54.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:54.0) Gecko/20100101 Firefox/54.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36 Edge/15.15063",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.79 Safari/537.36 Edge/14.14393",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/603.2.5 (KHTML, like Gecko) Version/10.1.1 Safari/603.2.5",
+    "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 6.3; WOW64; rv:54.0) Gecko/20100101 Firefox/54.0",
+    "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko"
+  ].freeze
+
+  attr_reader :name
+
+  def initialize(name)
+    @name = name
+  end
+
+  def exists?
+    response.code != 404
+  end
+
+  def public?
+    response.code == 200
+  end
+
+  def url
+    @url
+  end
+
+private
+
+  def response
+    @response ||= request_bucket
+  end
+
+  def request_bucket
+    @url     = "https://#{REGION}/#{escape(name)}/"
+    response = HTTParty.head(@url, :headers => { "User-Agent" => USER_AGENTS.sample }, :verify => false, :timeout => 30)
+    if response.code == 301
+      @url = "https://#{name}.#{REGION}/"
+      response = HTTParty.head(@url, :headers => { "User-Agent" => USER_AGENTS.sample }, :verify => false, :timeout => 30)
+    end
+    response
+  end
+
+  def escape(string)
+    CGI.escape(string)
+  end
+end
+
+def with_mutex
+  MUTEX.synchronize { yield }
+end
+
+if ARGV.empty?
+  puts "USAGE: #{0} WORDLIST"
+  exit 1
+end
+
+wordlist    = Wordlist.new(ARGV.first)
+thread_pool = Thread.pool(THREADS)
+
+wordlist.run do |bucket_name|
+  thread_pool.process do
+    begin
+      if Bucket.where(:name => bucket_name).limit(1).count.zero?
+        bucket = S3Bucket.new(bucket_name)
+        if bucket.exists?
+          if bucket.public?
+            with_mutex { puts " +  PUBLIC: #{bucket.url.bold}".green }
+          else
+            with_mutex { puts " - PRIVATE: #{bucket.url.bold}".yellow }
+          end
+        end
+        Bucket.new(
+          :name   => bucket.name,
+          :url    => bucket.url,
+          :exists => bucket.exists?,
+          :public => bucket.public?,
+        ).save
+      end
+    rescue => e
+      with_mutex { puts " !   ERROR: Bucket: #{bucket_name.bold}: #{e.class}: #{e.message}".red }
+    end
+  end
+end
+thread_pool.shutdown

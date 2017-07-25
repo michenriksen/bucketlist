@@ -1,0 +1,43 @@
+<div class="page-header">
+  <h1>SQL Console</h1>
+</div>
+
+<form action="/console" method="post">
+  <div class="form-group">
+    <textarea class="form-control" style="font-family: Consolas,Menlo,Monaco,Lucida Console,Liberation Mono,DejaVu Sans Mono,Bitstream Vera Sans Mono,Courier New,monospace,sans-serif;" name="query" id="sql_query" placeholder="SQL query..."><%=h @query %></textarea>
+  </div>
+  <div class="form-group">
+    <input type="submit" class="btn btn-primary btn-block" name="query_submit" value="Execute" />
+  </div>
+</form>
+
+<% if !@query %>
+  <h2>Enter an SQL query to execute...</h2>
+<% elsif @error %>
+  <div class="alert alert-danger" role="alert"><%=h @error %></div>
+<% elsif @query && @rows && @rows.count.zero? %>
+  <h2>Nothing to show</h2>
+<% else %>
+  <table class="table table-hover table-striped" style="font-family: Consolas,Menlo,Monaco,Lucida Console,Liberation Mono,DejaVu Sans Mono,Bitstream Vera Sans Mono,Courier New,monospace,sans-serif;">
+    <thead>
+      <tr>
+        <% @columns.each do |column| %>
+          <th><%=h column.to_s %></th>
+        <% end %>
+      </tr>
+    </thead>
+    <tbody>
+      <% @rows.each do |row| %>
+        <tr>
+        <% row.values.each do |value| %>
+          <% if url?(value) %>
+            <td><a href="<%=h value %>" target="_blank"><%=h value %></a></td>
+          <% else %>
+            <td><%=h value %></td>
+          <% end %>
+        <% end %>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>

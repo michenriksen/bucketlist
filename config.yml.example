@@ -1,0 +1,6 @@
+---
+db_host: localhost
+db_port: 5432
+db: bucketlist
+db_username: bucketlist
+db_password: bucketlist

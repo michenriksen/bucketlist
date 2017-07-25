@@ -1,0 +1,121 @@
+#!/usr/bin/env ruby
+
+require_relative "../bootstrap"
+DB.loggers << Logger.new($stdout)
+
+class WebApp < Sinatra::Base
+  set :server, :thin
+  set :environment, :production
+  set :logging, false
+  set :sessions, true
+  set :app_file, __FILE__
+  set :root, File.expand_path(File.dirname(__FILE__))
+  set :public_folder, proc { File.join(root, "..", "webapp", "public") }
+  set :views, proc { File.join(root, "..", "webapp", "views") }
+
+  helpers do
+    HUMAN_PREFIXES = %w(TB GB MB KB B).freeze
+
+    alias_method :h, :escape_html
+
+    def number_to_human_size(number)
+      s = number.to_f
+      i = HUMAN_PREFIXES.length - 1
+      while s > 512 && i > 0
+        i -= 1
+        s /= 1024
+      end
+      ((s > 9 || s.modulo(1) < 0.1 ? "%d" : "%.1f") % s) + "<strong>#{HUMAN_PREFIXES[i]}</strong>"
+    end
+
+    def format_path(path)
+      dirname  = File.dirname(path)
+      basename = File.basename(path)
+      if dirname == "."
+        "<strong>#{h basename}</strong>"
+      else
+        "#{h ellipsisize(dirname, 60, 25)}/<strong>#{h basename}</strong>"
+      end
+    end
+
+    def ellipsisize(string, minimum_length=4, edge_length=3)
+      return string if string.length < minimum_length || string.length <= edge_length * 2
+      edge = "." * edge_length
+      mid_length = string.length - edge_length * 2
+      string.gsub(/(#{edge}).{#{mid_length},}(#{edge})/, '\1...\2')
+    end
+
+    def url?(string)
+      uri = URI.parse(string)
+      %w(http https).include?(uri.scheme)
+    rescue URI::BadURIError, URI::InvalidURIError
+      false
+    end
+  end
+
+  before do
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["X-Frame-Options"] = "deny"
+  end
+
+  get "/" do
+    redirect("/buckets")
+  end
+
+  get "/buckets" do
+    if params[:query] && params[:query] != ""
+      @query   = params[:query]
+      @buckets = Bucket.where("LOWER(name) LIKE ?", "%#{params[:query].downcase}%").where("crawled_at IS NOT NULL").order(:name).paginate((params[:page] || 1).to_i, 100)
+    else
+      @buckets = Bucket.order(:name).where("crawled_at IS NOT NULL").paginate((params[:page] || 1).to_i, 100)
+    end
+    erb :"buckets/index"
+  end
+
+  get "/buckets/:name" do
+    @bucket = Bucket.where("name = ?", params[:name]).where("crawled_at IS NOT NULL").first
+    halt(404) unless @bucket
+    if params[:query] && params[:query] != ""
+      @query   = params[:query]
+      @objects = @bucket.bucket_objects_dataset.where("LOWER(key) LIKE ?", "%#{params[:query].downcase}%").order(:key).paginate((params[:page] || 1).to_i, 250)
+    else
+      @objects = @bucket.bucket_objects_dataset.order(:key).paginate((params[:page] || 1).to_i, 250)
+    end
+    erb :"buckets/show"
+  end
+
+  get "/objects" do
+    if params[:query] && params[:query] != ""
+      @query   = params[:query]
+      @objects = BucketObject.where("LOWER(key) LIKE ? ", "%#{params[:query].downcase}%").order(:key).paginate((params[:page] || 1).to_i, 250).eager(:bucket)
+    else
+      @objects = BucketObject.order(Sequel.desc(:created_at), :key).paginate((params[:page] || 1).to_i, 250).eager(:bucket)
+    end
+    erb :"objects/index"
+  end
+
+  get "/console" do
+    erb :"console/index"
+  end
+
+  post "/console" do
+    if params[:query] && params[:query] != ""
+      begin
+        @query   = params[:query]
+        @rows    = DB[params[:query]]
+        @columns = @rows.columns.map(&:to_s)
+      rescue Sequel::DatabaseError => e
+        @error = e.message
+      end
+    end
+    erb :"console/index"
+  end
+
+  get "/random_bucket" do
+    bucket = Bucket.where("public IS TRUE").where("crawled_at IS NOT NULL").order(Sequel.lit("RANDOM()")).first
+    redirect("/buckets/#{h(bucket.name)}")
+  end
+end
+
+WebApp.run!(:port => 3000)
