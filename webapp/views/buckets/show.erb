@@ -1,5 +1,11 @@
 <div class="page-header">
-  <h1>Contents of <%=h @bucket[:name] %></h1>
+  <h1>Contents of <%=h @bucket[:name] %>
+    <% if @bucket.starred? %>
+      <a href="#" class="btn btn-warning active star-bucket" data-bucket-id="<%=h @bucket.id %>" role="button"><span class="glyphicon glyphicon glyphicon-star"></span></a>
+    <% else %>
+      <a href="#" class="btn btn-default star-bucket" data-bucket-id="<%=h @bucket.id %>" role="button"><span class="glyphicon glyphicon-star-empty"></span></a>
+    <% end %>
+  </h1>
 </div>
 
 <form action="/buckets/<%=h @bucket[:name] %>" method="get">
