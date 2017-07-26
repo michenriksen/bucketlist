@@ -25,7 +25,7 @@ DB = Sequel.connect("postgres://#{CONFIG['db_username']}:#{CONFIG['db_password']
 Sequel.extension :migration
 Sequel::Model.db.extension(:pagination)
 Sequel::Model.plugin :timestamps
-Sequel::Migrator.run(DB, "db/migrations", :use_transactions => true)
+Sequel::Migrator.run(DB, File.join(File.dirname(__FILE__), "db", "migrations"), :use_transactions => true)
 
 require_relative "db/models/bucket"
 require_relative "db/models/bucket_object"
