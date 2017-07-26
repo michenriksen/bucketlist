@@ -23,6 +23,7 @@
         <th>Size</th>
         <th style="width:70px">Access</th>
         <th style="width:130px; text-align:right">Last Modified At</th>
+        <th style="width:20px;text-align:center"><span class="glyphicon glyphicon-star-empty"></th>
       </tr>
     </thead>
     <tbody>
@@ -32,7 +33,12 @@
           <td><a href="/buckets/<%=h object.bucket.name %>"><%=h object.bucket.name %></a></td>
           <td><%= number_to_human_size(object.size) %></td>
           <td><%=h object.public ? "Public" : "Private" %></td>
-          <td><%=h object.last_modified_at.strftime("%d/%m/%Y %H:%M") %></td>
+          <td style="text-align:right"><%=h object.last_modified_at.strftime("%d/%m/%Y %H:%M") %></td>
+          <% if object.starred? %>
+            <td><a href="#" class="btn btn-warning btn-xs active star-object" data-object-id="<%=h object.id %>" role="button"><span class="glyphicon glyphicon glyphicon-star"></span></a></td>
+          <% else %>
+            <td><a href="#" class="btn btn-default btn-xs star-object" data-object-id="<%=h object.id %>" role="button"><span class="glyphicon glyphicon-star-empty"></span></a></td>
+          <% end %>
         </tr>
       <% end %>
     </tbody>

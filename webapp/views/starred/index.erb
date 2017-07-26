@@ -1,0 +1,71 @@
+<div class="page-header">
+    <h1>Starred Buckets</h1>
+</div>
+
+<% if @buckets.count.zero? %>
+  <p>You haven't starred any Buckets yet.</p>
+<% else %>
+  <table class="table table-hover table-striped">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>URL</th>
+        <th style="width:130px; text-align:right">Crawled At</th>
+        <th style="width:130px; text-align:right">Discovered At</th></th>
+        <th style="width:20px;text-align:center"><span class="glyphicon glyphicon-star-empty"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @buckets.each do |bucket| %>
+        <tr>
+          <td><strong><a href="/buckets/<%=h bucket.name %>"><%=h bucket.name %></a></strong></td>
+          <td><a href="<%=h bucket.url %>" target="_blank"><%=h bucket.url %></a></td>
+          <td style="text-align:right"><%=h bucket.crawled_at ? bucket.crawled_at.strftime("%d/%m/%Y %H:%M") : "Never" %></td>
+          <td style="text-align:right"><%=h bucket.created_at.strftime("%d/%m/%Y %H:%M") %></td>
+          <% if bucket.starred? %>
+            <td><a href="#" class="btn btn-warning btn-xs active star-bucket" data-bucket-id="<%=h bucket.id %>" role="button"><span class="glyphicon glyphicon glyphicon-star"></span></a></td>
+          <% else %>
+            <td><a href="#" class="btn btn-default btn-xs star-bucket" data-bucket-id="<%=h bucket.id %>" role="button"><span class="glyphicon glyphicon-star-empty"></span></a></td>
+          <% end %>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
+
+<div class="page-header">
+    <h1>Starred Objects</h1>
+</div>
+
+<% if @objects.count.zero? %>
+  <p>You haven't starred any Objects yet.</p>
+<% else %>
+  <table class="table table-hover table-striped">
+    <thead>
+      <tr>
+        <th>Key</th>
+        <th>Bucket</th>
+        <th>Size</th>
+        <th style="width:70px">Access</th>
+        <th style="width:130px; text-align:right">Last Modified At</th>
+        <th style="width:20px;text-align:center"><span class="glyphicon glyphicon-star-empty"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @objects.all.each do |object| %>
+        <tr class="<%=h object.public ? 'success' : 'warning' %>">
+          <td><a href="<%=h object.url %>" onclick="return confirm('Are you sure?')" target="_blank"><%= format_path(object.key) %></a></td>
+          <td><a href="/buckets/<%=h object.bucket.name %>"><%=h object.bucket.name %></a></td>
+          <td><%= number_to_human_size(object.size) %></td>
+          <td><%=h object.public ? "Public" : "Private" %></td>
+          <td style="text-align:right"><%=h object.last_modified_at.strftime("%d/%m/%Y %H:%M") %></td>
+          <% if object.starred? %>
+            <td><a href="#" class="btn btn-warning btn-xs active star-object" data-object-id="<%=h object.id %>" role="button"><span class="glyphicon glyphicon glyphicon-star"></span></a></td>
+          <% else %>
+            <td><a href="#" class="btn btn-default btn-xs star-object" data-object-id="<%=h object.id %>" role="button"><span class="glyphicon glyphicon-star-empty"></span></a></td>
+          <% end %>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>

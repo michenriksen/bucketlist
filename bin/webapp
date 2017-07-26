@@ -85,6 +85,22 @@ class WebApp < Sinatra::Base
     erb :"buckets/show"
   end
 
+  post "/buckets/:id/star" do
+    @bucket = Bucket.where(:id => params[:id]).first
+    halt(404) unless @bucket
+    @bucket.starred_at = Time.now
+    @bucket.save
+    halt 200
+  end
+
+  post "/buckets/:id/unstar" do
+    @bucket = Bucket.where(:id => params[:id]).first
+    halt(404) unless @bucket
+    @bucket.starred_at = nil
+    @bucket.save
+    halt 200
+  end
+
   get "/objects" do
     if params[:query] && params[:query] != ""
       @query   = params[:query]
@@ -93,6 +109,22 @@ class WebApp < Sinatra::Base
       @objects = BucketObject.order(Sequel.desc(:created_at), :key).paginate((params[:page] || 1).to_i, 250).eager(:bucket)
     end
     erb :"objects/index"
+  end
+
+  post "/objects/:id/star" do
+    @object = BucketObject.where(:id => params[:id]).first
+    halt(404) unless @object
+    @object.starred_at = Time.now
+    @object.save
+    halt 200
+  end
+
+  post "/objects/:id/unstar" do
+    @object = BucketObject.where(:id => params[:id]).first
+    halt(404) unless @object
+    @object.starred_at = nil
+    @object.save
+    halt 200
   end
 
   get "/console" do
@@ -110,6 +142,12 @@ class WebApp < Sinatra::Base
       end
     end
     erb :"console/index"
+  end
+
+  get "/starred" do
+    @buckets = Bucket.where("starred_at IS NOT NULL").order(Sequel.desc(:created_at), :name)
+    @objects = BucketObject.where("starred_at IS NOT NULL").order(Sequel.desc(:created_at), :key).eager(:bucket)
+    erb :"starred/index"
   end
 
   get "/random_bucket" do

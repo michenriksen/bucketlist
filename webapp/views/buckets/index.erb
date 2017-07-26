@@ -16,8 +16,9 @@
       <tr>
         <th>Name</th>
         <th>URL</th>
-        <th>Crawled At</th>
-        <th>Discovered At</th></th>
+        <th style="width:130px; text-align:right">Crawled At</th>
+        <th style="width:130px; text-align:right">Discovered At</th></th>
+        <th style="width:20px;text-align:center"><span class="glyphicon glyphicon-star-empty"></th>
       </tr>
     </thead>
     <tbody>
@@ -25,13 +26,18 @@
         <tr>
           <td><strong><a href="/buckets/<%=h bucket.name %>"><%=h bucket.name %></a></strong></td>
           <td><a href="<%=h bucket.url %>" target="_blank"><%=h bucket.url %></a></td>
-          <td><%=h bucket.crawled_at ? bucket.crawled_at.strftime("%d/%m/%Y %H:%M") : "Never" %></td>
-          <td><%=h bucket.created_at.strftime("%d/%m/%Y %H:%M") %></td>
+          <td style="text-align:right"><%=h bucket.crawled_at ? bucket.crawled_at.strftime("%d/%m/%Y %H:%M") : "Never" %></td>
+          <td style="text-align:right"><%=h bucket.created_at.strftime("%d/%m/%Y %H:%M") %></td>
+          <% if bucket.starred? %>
+            <td><a href="#" class="btn btn-warning btn-xs active star-bucket" data-bucket-id="<%=h bucket.id %>" role="button"><span class="glyphicon glyphicon glyphicon-star"></span></a></td>
+          <% else %>
+            <td><a href="#" class="btn btn-default btn-xs star-bucket" data-bucket-id="<%=h bucket.id %>" role="button"><span class="glyphicon glyphicon-star-empty"></span></a></td>
+          <% end %>
         </tr>
       <% end %>
     </tbody>
   </table>
-  
+
   <ul class="pager">
     <% if @buckets.first_page? %>
       <li class="disabled"><a href="#">&laquo; Previous page</a></li>
