@@ -145,8 +145,8 @@ class WebApp < Sinatra::Base
   end
 
   get "/starred" do
-    @buckets = Bucket.where("starred_at IS NOT NULL").order(Sequel.desc(:created_at), :name)
-    @objects = BucketObject.where("starred_at IS NOT NULL").order(Sequel.desc(:created_at), :key).eager(:bucket)
+    @buckets = Bucket.where("starred_at IS NOT NULL").order(Sequel.asc(:created_at))
+    @objects = BucketObject.where("starred_at IS NOT NULL").order(Sequel.asc(:created_at)).eager(:bucket)
     erb :"starred/index"
   end
 
