@@ -20,10 +20,12 @@ class Wordlist
       word.strip!
       next if word.empty?
       yield word
-      PERMUTATION_PATTERNS.each do |permutation_pattern|
-        PERMUTATION_WORDS.each do |permutation_word|
-          yield format(permutation_pattern, word, permutation_word)
-          yield format(permutation_pattern, permutation_word, word)
+      if @options[:permutations]
+	    PERMUTATION_PATTERNS.each do |permutation_pattern|
+	      PERMUTATION_WORDS.each do |permutation_word|
+	        yield format(permutation_pattern, word, permutation_word)
+	        yield format(permutation_pattern, permutation_word, word)
+	      end
         end
       end
     end
@@ -104,9 +106,31 @@ def with_mutex
 end
 
 if ARGV.empty?
-  puts "USAGE: #{0} WORDLIST"
+  puts "USAGE: #{0} [options] WORDLIST"
   exit 1
 end
+
+options = {}
+optparse = OptionParser.new do|opts|
+  # Set a banner, displayed at the top
+  # of the help screen.
+  opts.banner = "USAGE: #{0} [options] WORDLIST"
+
+  # Define the options, and what they do
+  options[:showprivate] = true
+  opts.on( '--no-private', 'Suppress printing of private buckets' ) do
+    options[:showprivate] = false
+  end
+
+  options[:permutations] = true
+  opts.on( '--no-perm', 'Don\'t permute the wordlist' ) do
+    options[:permutations] = false
+  end
+end
+
+#parse and remove from ARGV
+optparse.parse!
+
 
 wordlist    = Wordlist.new(ARGV.first)
 thread_pool = Thread.pool(THREADS)
@@ -119,7 +143,7 @@ wordlist.run do |bucket_name|
         if bucket.exists?
           if bucket.public?
             with_mutex { puts " +  PUBLIC: #{bucket.url.bold}".green }
-          else
+          elsif options[:showprivate]
             with_mutex { puts " - PRIVATE: #{bucket.url.bold}".yellow }
           end
         end
