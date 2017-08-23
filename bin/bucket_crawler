@@ -22,6 +22,21 @@ def with_mutex
   MUTEX.synchronize { yield }
 end
 
+options = {}
+optparse = OptionParser.new do|opts|
+  # Set a banner, displayed at the top
+  # of the help screen.
+  opts.banner = "Usage: ruby bucket_crawler [options]"
+
+  # Define the options, and what they do
+  options[:showprivate] = true
+  opts.on( '--no-private', 'Suppress printing of private buckets' ) do
+    options[:showprivate] = false
+  end
+end
+
+optparse.parse!
+
 buckets = Bucket.where(:public => true, :crawled_at => nil)
 
 if buckets.count.zero?
@@ -56,7 +71,9 @@ buckets.each do |bucket|
               with_mutex { puts "│   ├──  " + "PUBLIC: #{object.url.bold} (#{Util.number_to_human_size(object.size)})".green }
             else
               object.public = false
-              with_mutex { puts "│   ├── " + "PRIVATE: #{object.url.bold} (#{Util.number_to_human_size(object.size)})".yellow }
+              if options[:showprivate]
+                with_mutex { puts "│   ├── " + "PRIVATE: #{object.url.bold} (#{Util.number_to_human_size(object.size)})".yellow }
+              end
             end
             object.save
           end

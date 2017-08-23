@@ -10,6 +10,7 @@ require "timeout"
 require "sinatra"
 require "colorize"
 require "yaml"
+require "optparse"
 
 CONFIG_FILE_PATH = File.join(File.dirname(__FILE__), "config.yml").freeze
 
